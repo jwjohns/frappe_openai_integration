@@ -76,7 +76,7 @@ frappe.pages['frappe-chatbot'].on_page_load = function(wrapper) {
 		chat_area.scrollTop(chat_area[0].scrollHeight);
 
 		frappe.call({
-			method: "frappe_openai_integration.api.ask_openai",
+			method: "frappe_openai_integration.api.ask_llm",
 			args: { prompt: val },
 			callback: function(r) {
 				typing.remove();

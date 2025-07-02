@@ -10,16 +10,33 @@
   "column_break_epbc"
  ],
  "fields": [
+ {
+  "fieldname": "llm_provider",
+  "fieldtype": "Select",
+  "label": "LLM Provider",
+  "options": "ollama\nopenai",
+  "default": "ollama",
+  "reqd": 1
+ },
   {
    "fieldname": "api_key",
    "fieldtype": "Small Text",
-   "label": "API Key"
+  "label": "OpenAI API Key",
+  "depends_on": "eval:doc.llm_provider==\"openai\""
+ },
+ {
+  "fieldname": "ollama_api_url",
+  "fieldtype": "Data",
+  "label": "Ollama API URL",
+  "default": "http://host.docker.internal:11434",
+  "depends_on": "eval:doc.llm_provider==\"ollama\"",
+  "description": "URL for your Ollama service. If running ERPNext in Docker and Ollama on host, use http://host.docker.internal:11434"
   },
   {
    "fieldname": "model",
    "fieldtype": "Select",
    "label": "Model",
-   "options": "Auto\ngpt-4o-mini\ngpt-4-turbo\ngpt-4\ngpt-3.5-turbo\ngpt-3.5-turbo-16k"
+  "options": "Auto\ngpt-4o-mini\ngpt-4-turbo\ngpt-4\ngpt-3.5-turbo\ngpt-3.5-turbo-16k\nllama2\nmistral\nllava\ngemma"
   },
   {
    "fieldname": "column_break_epbc",
