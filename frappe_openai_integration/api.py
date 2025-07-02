@@ -21,8 +21,45 @@ def get_llm_settings():
     return frappe.get_single("OpenAI Integration Settings")
 
 
+import re # Import re for regex operations
+
 def get_llm_response(prompt):
     settings = get_llm_settings()
+
+    # Attempt to extract item context if query seems related to stock
+    erp_context_str = ""
+    # Basic keyword detection and item extraction
+    # This is a simplified approach and can be significantly improved with proper NLU
+    stock_keywords = ["stock", "inventory", "how many", "available", "quantity", "count of"]
+    # Regex to find potential item codes (alphanumeric, dashes, dots) or quoted names
+    item_pattern = r"([A-Za-z0-9\-\.]+)|(\"[^\"]+\")|(\'[^\']+\')"
+
+    prompt_lower = prompt.lower()
+    found_item_identifier = None
+
+    if any(keyword in prompt_lower for keyword in stock_keywords):
+        matches = re.findall(item_pattern, prompt)
+        for match_group in matches:
+            # match_group is a tuple, e.g., ('ITEM-001', '', '') or ('', '"Item Name"', '')
+            # Iterate through the tuple to find the non-empty match
+            for potential_identifier in match_group:
+                if potential_identifier:
+                    # Remove quotes if present
+                    found_item_identifier = potential_identifier.strip("\"'")
+                    break
+            if found_item_identifier:
+                break # Found the first likely item identifier
+
+        if found_item_identifier:
+            erp_data = get_item_stock_context(found_item_identifier)
+            if erp_data and not erp_data.startswith("Item '") and not erp_data.startswith("No stock found") and not erp_data.startswith("No item identifier"):
+                erp_context_str = f"ERPNext Data Context:\n{erp_data}\n\nUser Query:\n"
+            elif erp_data: # Item not found or no stock, pass this info to LLM
+                 erp_context_str = f"ERPNext Data Context:\n{erp_data}\n\nUser Query:\n"
+
+
+    # Prepend context to the original prompt if available
+    final_prompt = erp_context_str + prompt
 
     try:
         if settings.llm_provider == "ollama":
@@ -32,7 +69,7 @@ def get_llm_response(prompt):
             client = ollama.Client(host=settings.ollama_api_url)
             response = client.chat(
                 model=settings.model if settings.model != "Auto" else "llama2", # Default to llama2 if Auto for ollama
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": final_prompt}]
             )
             answer = response['message']['content']
             return answer
@@ -48,7 +85,7 @@ def get_llm_response(prompt):
                 model_to_use = "gpt-3.5-turbo"
 
             response = client.chat.completions.create(
-                model=model_to_use, messages=[{"role": "user", "content": prompt}]
+                model=model_to_use, messages=[{"role": "user", "content": final_prompt}]
             )
             answer = response.choices[0].message.content
             return answer
@@ -66,6 +103,42 @@ def ask_llm(prompt):
     answer = get_llm_response(prompt)
     return answer
 
+# --- ERPNext Data Integration Functions ---
+def get_item_stock_context(item_identifier):
+    """
+    Fetches stock context for a given item identifier (code or name).
+    Returns a formatted string with stock details or an error message.
+    """
+    if not item_identifier:
+        return "No item identifier provided."
+
+    # Check if identifier is an item code or item name
+    item_filter_field = "name" if frappe.db.exists("Item", item_identifier) else "item_name"
+
+    item = frappe.db.get_value("Item", {item_filter_field: item_identifier}, ["name", "item_name", "stock_uom"], as_dict=True)
+
+    if not item:
+        return f"Item '{item_identifier}' not found."
+
+    item_code = item.get("name")
+    item_name = item.get("item_name")
+    stock_uom = item.get("stock_uom")
+
+    bin_entries = frappe.get_all(
+        "Bin",
+        filters={"item_code": item_code, "actual_qty": [">", 0]},
+        fields=["warehouse", "actual_qty"]
+    )
+
+    if not bin_entries:
+        return f"No stock found for item: {item_name} ({item_code})."
+
+    context_parts = [f"Stock for {item_name} ({item_code}) - UOM: {stock_uom}:"]
+    for entry in bin_entries:
+        context_parts.append(f"- {entry.actual_qty} units in Warehouse '{entry.warehouse}'.")
+
+    return "\n".join(context_parts)
+# --- End ERPNext Data Integration Functions ---
 
 @frappe.whitelist()
 def save_chat_message(prompt, response):

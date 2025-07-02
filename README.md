@@ -12,6 +12,7 @@ A powerful custom Frappe app that integrates Large Language Models (LLMs) like t
 - ⚙️ Configurable LLM Providers:
     - **Ollama**: Connect to a locally running Ollama instance.
     - **OpenAI**: Use OpenAI's API with your key.
+- 📦 **Query Item Stock Levels**: Ask the chat assistant about the stock levels of items in your ERPNext inventory.
 - 📊 Dashboard showing prompt stats (total prompts, settings, etc.)
 - 🔐 Role-based access control for using AI features
 - 💬 Multi-message threads or single prompts
@@ -83,3 +84,35 @@ After installation, navigate to "Home > Integrations > LLM Integration Settings"
 4.  Save the settings.
 
 Now you can access the "Frappe Chat Assistant" page from your desk and start interacting with the configured LLM.
+
+---
+
+## 🗣️ Interacting with ERPNext Data (Proof of Concept)
+
+This integration includes a proof-of-concept feature allowing you to query item stock levels directly through the chat interface.
+
+### Querying Item Stock
+
+You can ask questions about the stock of specific items. The system will attempt to find the item in your ERPNext database and provide its current stock levels across different warehouses as context to the LLM.
+
+**Example Prompts:**
+
+*   "What is the stock of ITEM-CODE-123?"
+*   "How many "My Awesome Product" do we have in inventory?"
+*   "Tell me the quantity available for 'LAPTOP-001'."
+*   "inventory for ITEM-XYZ"
+
+**How it Works (Simplified):**
+
+1.  When you ask a question that includes keywords like "stock", "inventory", "how many", "quantity", etc., and an identifiable item name or code (e.g., "ITEM-CODE-123" or "My Awesome Product" in quotes).
+2.  The system fetches the current stock data for that item from your ERPNext (specifically from the `Bin` doctype).
+3.  This stock data is then added as context to your original question before sending it to the selected LLM (Ollama or OpenAI).
+4.  The LLM uses this context to answer your question.
+
+**Important Notes for this Proof-of-Concept:**
+
+*   **Item Identification:** The current item identification is basic. It looks for item codes or names enclosed in double or single quotes. For best results, use the exact item code or provide the item name in quotes.
+*   **Error Handling:** If an item isn't found or has no stock, this information is passed to the LLM as part of the context. The LLM should then inform you accordingly.
+*   **Scope:** This feature currently only supports querying item stock levels. More complex queries or other data types are not yet supported in this phase.
+
+This functionality is a first step towards deeper integration with your ERPNext data. Future enhancements will improve the natural language understanding and expand the range of queries and actions possible.
